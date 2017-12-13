@@ -63,6 +63,7 @@ function lastLogCheckpoint(req, res) {
         // sce successful email change
         const types_filter = ['du', 'ss', 'sdu'];
         const log_matches_types = (log) => {
+			console.log("Type: " + log.type);
           return log.type && types_filter.indexOf(log.type) >= 0;
         };
 

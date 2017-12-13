@@ -114,6 +114,7 @@ module.exports =
 	      // sce successful email change
 	      var types_filter = ['du', 'ss', 'sdu'];
 	      var log_matches_types = function log_matches_types(log) {
+	        console.log("Type: " + log.type);
 	        return log.type && types_filter.indexOf(log.type) >= 0;
 	      };
 
