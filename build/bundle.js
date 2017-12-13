@@ -138,7 +138,7 @@ module.exports =
 	        return callback(new NestedError('Error parsing FIREBASE_SECRET_KEY json: ', err));
 	      }
 	      fbadmin.initializeApp({
-	        cert: secretKey
+	        credential: secretKey
 	      });
 
 	      async.eachLimit(context.logs, concurrent_calls, function (log, cb) {
