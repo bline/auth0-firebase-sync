@@ -27,5 +27,6 @@
     "FIREBASE_SECRET_KEY": {
       "description": "Firebase Admin SDK key (json)"
     }
-  }
+  },
+  "codeUrl": "https://raw.githubusercontent.com/bline/auth0-firebase-sync/master/build/bundle.js"
 }
