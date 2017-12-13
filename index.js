@@ -78,7 +78,6 @@ function lastLogCheckpoint(req, res) {
 
         const concurrent_calls = 1;
 
-        console.log(`Sending to '${url}' with ${concurrent_calls} concurrent calls.`);
         var secretKey;
         try {
           secretKey = fbadmin.credential.cert(JSON.parse(ctx.data.FIREBASE_SECRET_KEY));
