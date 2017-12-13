@@ -1,0 +1,31 @@
+{
+  "title": "Firebase Module to Sync Users",
+  "name": "bline-firebase-sync",
+  "version": "0.1.0",
+  "author": "Scott Beck",
+  "description": "Allows you to sync your users in Auth0 with Firebase by scanning logs on a wt cron.",
+  "type": "cron",
+  "logoUrl": "https://cdn.auth0.com/extensions/auth0-authentication-api-webhooks/assets/logo.png",
+  "repository": "https://github.com/bline/auth0-firebase-sync",
+  "keywords": [
+    "auth0",
+    "extension"
+  ],
+  "schedule": "0 */15 * * * *",
+  "auth0": {
+    "scopes": "read:logs"
+  },
+  "secrets": {
+    "BATCH_SIZE": {
+      "description": "The ammount of logs to be read on each execution. Maximun is 100.",
+      "default": 100
+    },
+    "AUTH0_API_ENDPOINTS": {
+      "description": "Allows you to filter specific API endpoints, comma separated.",
+      "example": "e.g.: users, connections, rules, logs, emails, stats, clients, tenants"
+    },
+    "FIREBASE_SECRET_KEY": {
+      "description": "Firebase Admin SDK key (json)"
+    }
+  }
+}
