@@ -4,7 +4,7 @@ const Webtask  = require('webtask-tools');
 const app      = express();
 const Request  = require('request');
 const memoizer = require('lru-memoizer');
-const NestedError = require('nested-error-stacks');
+const Error = require('nested-error-stacks');
 
 function lastLogCheckpoint(req, res) {
   let ctx               = req.webtaskContext;
@@ -35,7 +35,7 @@ function lastLogCheckpoint(req, res) {
           getLogsFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, take, context.checkpointId, (err, logs) => {
             if (err) {
               console.log('Error getting logs from Auth0', err);
-              return callback(new NestedError('Error getting logs from Auth0.', err));
+              return callback(new Error('Error getting logs from Auth0: ' + err));
             }
 
             if (logs && logs.length) {
@@ -84,7 +84,7 @@ function lastLogCheckpoint(req, res) {
           secretKey = fbadmin.credential.cert(JSON.parse(ctx.data.FIREBASE_SECRET_KEY));
         } catch (err) {
 		  console.log("Error parsing FIREBASE_SECRET_KEY json: ", err);
-          return callback(new NestedError('Error parsing FIREBASE_SECRET_KEY json',err));
+          return callback(new Error('Error parsing FIREBASE_SECRET_KEY json: ' + err));
         }
         fbadmin.initializeApp({
           cert: secretKey
@@ -102,7 +102,7 @@ function lastLogCheckpoint(req, res) {
         return req.webtaskContext.storage.set({checkpointId: startCheckpointId}, {force: 1}, (error) => {
           if (error) {
             console.log('Error storing startCheckpoint', error);
-            return res.status(500).send({ error: new NestedError('Error storing startCheckpoint.', error)});
+            return res.status(500).send({ error: new Error('Error storing startCheckpoint: ' + error)});
           }
 
           res.status(500).send({
@@ -119,7 +119,7 @@ function lastLogCheckpoint(req, res) {
       }, {force: 1}, (error) => {
         if (error) {
           console.log('Error storing checkpoint', error);
-          return res.status(500).send({ error: new NestedError('Error storing checkpoint', error)});
+          return res.status(500).send({ error: new Error('Error storing checkpoint: ' + error)});
         }
 
         res.sendStatus(200);
@@ -334,7 +334,7 @@ function getPageOfLogsFromAuth0 (domain, token, take, from, cb) {
   }, (err, res, body) => {
     if (err) {
       console.log('Error getting logs', err);
-      cb(new NestedError('Error getting logs.', err));
+      cb(new Error('Error getting logs: ' + err));
     } else {
       cb(null, body);
     }
@@ -410,7 +410,7 @@ app.use(function (req, res, next) {
   getTokenCached(apiUrl, audience, clientId, clientSecret, function (access_token, err) {
     if (err) {
       console.log('Error getting access_token', err);
-      return next(new NestedError('Error getting access_token.', err));
+      return next(new Error('Error getting access_token: ' + err));
     }
 
     req.access_token = access_token;
