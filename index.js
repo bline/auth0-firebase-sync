@@ -63,12 +63,12 @@ function lastLogCheckpoint(req, res) {
         // sce successful email change
         const types_filter = ['du', 'ss', 'sdu'];
         const log_matches_types = (log) => {
-			console.log("Type: " + log.type);
+			console.log("Log: " + JSON.stringify(log));
           return log.type && types_filter.indexOf(log.type) >= 0;
         };
 
         context.logs = context.logs
-          .filter(l => l.type !== 'sapi' && l.type !== 'fapi')
+          //.filter(l => l.type !== 'sapi' && l.type !== 'fapi')
           .filter(log_matches_level)
           .filter(log_matches_types);
 

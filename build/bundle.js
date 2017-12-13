@@ -114,13 +114,13 @@ module.exports =
 	      // sce successful email change
 	      var types_filter = ['du', 'ss', 'sdu'];
 	      var log_matches_types = function log_matches_types(log) {
-	        console.log("Type: " + log.type);
+	        console.log("Log: " + JSON.stringify(log));
 	        return log.type && types_filter.indexOf(log.type) >= 0;
 	      };
 
-	      context.logs = context.logs.filter(function (l) {
-	        return l.type !== 'sapi' && l.type !== 'fapi';
-	      }).filter(log_matches_level).filter(log_matches_types);
+	      context.logs = context.logs
+	      //.filter(l => l.type !== 'sapi' && l.type !== 'fapi')
+	      .filter(log_matches_level).filter(log_matches_types);
 
 	      callback(null, context);
 	    }, function (context, callback) {
