@@ -47,13 +47,14 @@ module.exports =
 
 	'use strict';
 
-	var async = __webpack_require__(1);
-	var express = __webpack_require__(2);
-	var Webtask = __webpack_require__(3);
+	var fbadmin = __webpack_require__(1);
+	var async = __webpack_require__(2);
+	var express = __webpack_require__(3);
+	var Webtask = __webpack_require__(4);
 	var app = express();
-	var Request = __webpack_require__(13);
-	var memoizer = __webpack_require__(14);
-	var Error = __webpack_require__(15);
+	var Request = __webpack_require__(14);
+	var memoizer = __webpack_require__(15);
+	var Error = __webpack_require__(16);
 
 	function lastLogCheckpoint(req, res) {
 	  var ctx = req.webtaskContext;
@@ -85,7 +86,7 @@ module.exports =
 	        getLogsFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, take, context.checkpointId, function (err, logs) {
 	          if (err) {
 	            console.log('Error getting logs from Auth0', err);
-	            return callback(new Error('Error getting logs from Auth0: ' + err));
+	            return callback(new NestedError('Error getting logs from Auth0: ', err));
 	          }
 
 	          if (logs && logs.length) {
@@ -134,7 +135,7 @@ module.exports =
 	        secretKey = fbadmin.credential.cert(JSON.parse(ctx.data.FIREBASE_SECRET_KEY));
 	      } catch (err) {
 	        console.log("Error parsing FIREBASE_SECRET_KEY json: ", err);
-	        return callback(new Error('Error parsing FIREBASE_SECRET_KEY json: ' + err));
+	        return callback(new NestedError('Error parsing FIREBASE_SECRET_KEY json: ', err));
 	      }
 	      fbadmin.initializeApp({
 	        cert: secretKey
@@ -151,7 +152,7 @@ module.exports =
 	        return req.webtaskContext.storage.set({ checkpointId: startCheckpointId }, { force: 1 }, function (error) {
 	          if (error) {
 	            console.log('Error storing startCheckpoint', error);
-	            return res.status(500).send({ error: new Error('Error storing startCheckpoint: ' + error) });
+	            return res.status(500).send({ error: new NestedError('Error storing startCheckpoint: ', error) });
 	          }
 
 	          res.status(500).send({
@@ -168,7 +169,7 @@ module.exports =
 	      }, { force: 1 }, function (error) {
 	        if (error) {
 	          console.log('Error storing checkpoint', error);
-	          return res.status(500).send({ error: new Error('Error storing checkpoint: ' + error) });
+	          return res.status(500).send({ error: new NestedError('Error storing checkpoint: ', error) });
 	        }
 
 	        res.sendStatus(200);
@@ -383,7 +384,7 @@ module.exports =
 	  }, function (err, res, body) {
 	    if (err) {
 	      console.log('Error getting logs', err);
-	      cb(new Error('Error getting logs: ' + err));
+	      cb(new NestedError('Error getting logs: ', err));
 	    } else {
 	      cb(null, body);
 	    }
@@ -461,7 +462,7 @@ module.exports =
 	  getTokenCached(apiUrl, audience, clientId, clientSecret, function (access_token, err) {
 	    if (err) {
 	      console.log('Error getting access_token', err);
-	      return next(new Error('Error getting access_token: ' + err));
+	      return next(new NestedError('Error getting access_token: ', err));
 	    }
 
 	    req.access_token = access_token;
@@ -478,19 +479,25 @@ module.exports =
 /* 1 */
 /***/ (function(module, exports) {
 
-	module.exports = require("async");
+	module.exports = require("firebase-admin");
 
 /***/ }),
 /* 2 */
 /***/ (function(module, exports) {
 
-	module.exports = require("express");
+	module.exports = require("async");
 
 /***/ }),
 /* 3 */
+/***/ (function(module, exports) {
+
+	module.exports = require("express");
+
+/***/ }),
+/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
-	exports.auth0 = __webpack_require__(4);
+	exports.auth0 = __webpack_require__(5);
 	exports.fromConnect = exports.fromExpress = fromConnect;
 	exports.fromHapi = fromHapi;
 	exports.fromServer = exports.fromRestify = fromServer;
@@ -575,7 +582,7 @@ module.exports =
 
 
 	    function readNotAvailable(path, options, cb) {
-	        var Boom = __webpack_require__(12);
+	        var Boom = __webpack_require__(13);
 
 	        if (typeof options === 'function') {
 	            cb = options;
@@ -586,8 +593,8 @@ module.exports =
 	    }
 
 	    function readFromPath(path, options, cb) {
-	        var Boom = __webpack_require__(12);
-	        var Request = __webpack_require__(13);
+	        var Boom = __webpack_require__(13);
+	        var Request = __webpack_require__(14);
 
 	        if (typeof options === 'function') {
 	            cb = options;
@@ -610,7 +617,7 @@ module.exports =
 	    }
 
 	    function writeNotAvailable(path, data, options, cb) {
-	        var Boom = __webpack_require__(12);
+	        var Boom = __webpack_require__(13);
 
 	        if (typeof options === 'function') {
 	            cb = options;
@@ -621,8 +628,8 @@ module.exports =
 	    }
 
 	    function writeToPath(path, data, options, cb) {
-	        var Boom = __webpack_require__(12);
-	        var Request = __webpack_require__(13);
+	        var Boom = __webpack_require__(13);
+	        var Request = __webpack_require__(14);
 
 	        if (typeof options === 'function') {
 	            cb = options;
@@ -646,14 +653,14 @@ module.exports =
 
 
 /***/ }),
-/* 4 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
-	var url = __webpack_require__(5);
-	var error = __webpack_require__(6);
-	var handleAppEndpoint = __webpack_require__(7);
-	var handleLogin = __webpack_require__(9);
-	var handleCallback = __webpack_require__(10);
+	var url = __webpack_require__(6);
+	var error = __webpack_require__(7);
+	var handleAppEndpoint = __webpack_require__(8);
+	var handleLogin = __webpack_require__(10);
+	var handleCallback = __webpack_require__(11);
 
 	module.exports = function (webtask, options) {
 	    if (typeof webtask !== 'function' || webtask.length !== 3) {
@@ -859,13 +866,13 @@ module.exports =
 
 
 /***/ }),
-/* 5 */
+/* 6 */
 /***/ (function(module, exports) {
 
 	module.exports = require("url");
 
 /***/ }),
-/* 6 */
+/* 7 */
 /***/ (function(module, exports) {
 
 	module.exports = function (err, res) {
@@ -878,10 +885,10 @@ module.exports =
 
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
-	var error = __webpack_require__(6);
+	var error = __webpack_require__(7);
 
 	module.exports = function (webtask, options, ctx, req, res, routingInfo) {
 	    return options.exclude && options.exclude(ctx, req, routingInfo.appPath)
@@ -910,7 +917,7 @@ module.exports =
 	        }
 
 	        try {
-	            ctx.user = req.user = __webpack_require__(8).verify(apiKey, secret);
+	            ctx.user = req.user = __webpack_require__(9).verify(apiKey, secret);
 	        }
 	        catch (e) {
 	            return options.loginError({
@@ -942,16 +949,16 @@ module.exports =
 
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports) {
 
 	module.exports = require("jsonwebtoken");
 
 /***/ }),
-/* 9 */
+/* 10 */
 /***/ (function(module, exports, __webpack_require__) {
 
-	var error = __webpack_require__(6);
+	var error = __webpack_require__(7);
 
 	module.exports = function(options, ctx, req, res, routingInfo) {
 	    var authParams = {
@@ -996,10 +1003,10 @@ module.exports =
 
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ (function(module, exports, __webpack_require__) {
 
-	var error = __webpack_require__(6);
+	var error = __webpack_require__(7);
 
 	module.exports = function (options, ctx, req, res, routingInfo) {
 	    if (!ctx.query.code) {
@@ -1023,7 +1030,7 @@ module.exports =
 	        }, res);
 	    }
 
-	    return __webpack_require__(11)
+	    return __webpack_require__(12)
 	        .post('https://' + authParams.domain + '/oauth/token')
 	        .type('form')
 	        .send({
@@ -1049,7 +1056,7 @@ module.exports =
 	        });
 
 	    function issueApiKey(id_token) {
-	        var jwt = __webpack_require__(8);
+	        var jwt = __webpack_require__(9);
 	        var claims;
 	        try {
 	            claims = jwt.decode(id_token);
@@ -1085,31 +1092,31 @@ module.exports =
 
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, exports) {
 
 	module.exports = require("superagent");
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, exports) {
 
 	module.exports = require("boom");
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, exports) {
 
 	module.exports = require("request");
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports) {
 
 	module.exports = require("lru-memoizer");
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports) {
 
 	module.exports = require("nested-error-stacks");
