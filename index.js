@@ -83,6 +83,7 @@ function lastLogCheckpoint(req, res) {
         try {
           secretKey = fbadmin.credential.cert(JSON.parse(ctx.data.FIREBASE_SECRET_KEY));
         } catch (err) {
+		  console.log("Error parsing FIREBASE_SECRET_KEY json: ", err);
           return callback(new NestedError('Error parsing FIREBASE_SECRET_KEY json',err));
         }
         fbadmin.initializeApp({
