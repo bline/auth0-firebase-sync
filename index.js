@@ -10,6 +10,7 @@ function lastLogCheckpoint(req, res) {
   let ctx               = req.webtaskContext;
   let required_settings = ['AUTH0_DOMAIN', 'AUTH0_CLIENT_ID', 'AUTH0_CLIENT_SECRET', 'FIREBASE_SECRET_KEY'];
   let missing_settings  = required_settings.filter((setting) => !ctx.data[setting]);
+  console.log("in lastLogCheckpoint");
 
   if (missing_settings.length) {
     return res.status(400).send({ message: 'Missing settings: ' + missing_settings.join(', ') });
@@ -59,7 +60,7 @@ function lastLogCheckpoint(req, res) {
         };
         // sdu successful user deletion
         // sce successful email change
-        const types_filter = ['du', 'ss'];
+        const types_filter = ['du', 'ss', 'sdu'];
         const log_matches_types = (log) => {
           return log.type && types_filter.indexOf(log.type) >= 0;
         };
@@ -404,6 +405,7 @@ app.use(function (req, res, next) {
   var clientId     = req.webtaskContext.data.AUTH0_CLIENT_ID;
   var clientSecret = req.webtaskContext.data.AUTH0_CLIENT_SECRET;
 
+  console.log("GetTokenCached");
   getTokenCached(apiUrl, audience, clientId, clientSecret, function (access_token, err) {
     if (err) {
       console.log('Error getting access_token', err);
