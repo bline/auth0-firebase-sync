@@ -20,10 +20,6 @@
       "description": "The ammount of logs to be read on each execution. Maximun is 100.",
       "default": 100
     },
-    "AUTH0_API_ENDPOINTS": {
-      "description": "Allows you to filter specific API endpoints, comma separated.",
-      "example": "e.g.: users, connections, rules, logs, emails, stats, clients, tenants"
-    },
     "FIREBASE_SECRET_KEY": {
       "description": "Firebase Admin SDK key (json)"
     }
