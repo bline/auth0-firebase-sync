@@ -73,6 +73,7 @@ function lastLogCheckpoint(req, res) {
         callback(null, context);
       },
       (context, callback) => {
+		console.log("Logs: " + context.logs.length);
         if (!context.logs.length) {
           return callback(null, context);
         }
@@ -97,7 +98,7 @@ function lastLogCheckpoint(req, res) {
       }
     ], (err, context) => {
       if (err) {
-        console.log('Job failed.');
+        console.log('Job failed: ', err);
 
         return req.webtaskContext.storage.set({checkpointId: startCheckpointId}, {force: 1}, (error) => {
           if (error) {
