@@ -53,7 +53,7 @@ module.exports =
 	var app = express();
 	var Request = __webpack_require__(13);
 	var memoizer = __webpack_require__(14);
-	var NestedError = __webpack_require__(15);
+	var Error = __webpack_require__(15);
 
 	function lastLogCheckpoint(req, res) {
 	  var ctx = req.webtaskContext;
@@ -61,6 +61,7 @@ module.exports =
 	  var missing_settings = required_settings.filter(function (setting) {
 	    return !ctx.data[setting];
 	  });
+	  console.log("in lastLogCheckpoint");
 
 	  if (missing_settings.length) {
 	    return res.status(400).send({ message: 'Missing settings: ' + missing_settings.join(', ') });
@@ -84,7 +85,7 @@ module.exports =
 	        getLogsFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, take, context.checkpointId, function (err, logs) {
 	          if (err) {
 	            console.log('Error getting logs from Auth0', err);
-	            return callback(new NestedError('Error getting logs from Auth0.', err));
+	            return callback(new Error('Error getting logs from Auth0: ' + err));
 	          }
 
 	          if (logs && logs.length) {
@@ -110,7 +111,7 @@ module.exports =
 	      };
 	      // sdu successful user deletion
 	      // sce successful email change
-	      var types_filter = ['du', 'ss'];
+	      var types_filter = ['du', 'ss', 'sdu'];
 	      var log_matches_types = function log_matches_types(log) {
 	        return log.type && types_filter.indexOf(log.type) >= 0;
 	      };
@@ -121,6 +122,7 @@ module.exports =
 
 	      callback(null, context);
 	    }, function (context, callback) {
+	      console.log("Logs: " + context.logs.length);
 	      if (!context.logs.length) {
 	        return callback(null, context);
 	      }
@@ -131,7 +133,8 @@ module.exports =
 	      try {
 	        secretKey = fbadmin.credential.cert(JSON.parse(ctx.data.FIREBASE_SECRET_KEY));
 	      } catch (err) {
-	        return callback(new NestedError('Error parsing FIREBASE_SECRET_KEY json', err));
+	        console.log("Error parsing FIREBASE_SECRET_KEY json: ", err);
+	        return callback(new Error('Error parsing FIREBASE_SECRET_KEY json: ' + err));
 	      }
 	      fbadmin.initializeApp({
 	        cert: secretKey
@@ -143,12 +146,12 @@ module.exports =
 	      });
 	    }], function (err, context) {
 	      if (err) {
-	        console.log('Job failed.');
+	        console.log('Job failed: ', err);
 
 	        return req.webtaskContext.storage.set({ checkpointId: startCheckpointId }, { force: 1 }, function (error) {
 	          if (error) {
 	            console.log('Error storing startCheckpoint', error);
-	            return res.status(500).send({ error: new NestedError('Error storing startCheckpoint.', error) });
+	            return res.status(500).send({ error: new Error('Error storing startCheckpoint: ' + error) });
 	          }
 
 	          res.status(500).send({
@@ -165,7 +168,7 @@ module.exports =
 	      }, { force: 1 }, function (error) {
 	        if (error) {
 	          console.log('Error storing checkpoint', error);
-	          return res.status(500).send({ error: new NestedError('Error storing checkpoint', error) });
+	          return res.status(500).send({ error: new Error('Error storing checkpoint: ' + error) });
 	        }
 
 	        res.sendStatus(200);
@@ -380,7 +383,7 @@ module.exports =
 	  }, function (err, res, body) {
 	    if (err) {
 	      console.log('Error getting logs', err);
-	      cb(new NestedError('Error getting logs.', err));
+	      cb(new Error('Error getting logs: ' + err));
 	    } else {
 	      cb(null, body);
 	    }
@@ -454,10 +457,11 @@ module.exports =
 	  var clientId = req.webtaskContext.data.AUTH0_CLIENT_ID;
 	  var clientSecret = req.webtaskContext.data.AUTH0_CLIENT_SECRET;
 
+	  console.log("GetTokenCached");
 	  getTokenCached(apiUrl, audience, clientId, clientSecret, function (access_token, err) {
 	    if (err) {
 	      console.log('Error getting access_token', err);
-	      return next(new NestedError('Error getting access_token.', err));
+	      return next(new Error('Error getting access_token: ' + err));
 	    }
 
 	    req.access_token = access_token;
