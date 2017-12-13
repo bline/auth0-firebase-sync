@@ -144,6 +144,8 @@ module.exports =
 	      async.eachLimit(context.logs, concurrent_calls, function (log, cb) {
 	        console.log("Log: ", log);
 	        cb();
+	      }, function (err) {
+	        callback(err, context);
 	      });
 	    }], function (err, context) {
 	      if (err) {

@@ -95,7 +95,9 @@ function lastLogCheckpoint(req, res) {
         async.eachLimit(context.logs, concurrent_calls, (log, cb) => {
           console.log("Log: ", log);
           cb();
-        });
+        }, (err) => {
+			callback(err, context);
+		});
       }
     ], (err, context) => {
       if (err) {
