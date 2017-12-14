@@ -46,13 +46,7 @@ function lastLogCheckpoint(req, res) {
     async.waterfall([
       (callback) => {
         const getLogs = (context) => {
-          console.log(`Logs from: ${context.checkpointId || 'Start'}.`);
-
-          let take = Number.parseInt(ctx.data.BATCH_SIZE);
-
-          context.logs = context.logs || [];
-
-          getLogsFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, take, context.checkpointId, (err, logs) => {
+          const handleLogs = (err, logs) => {
             if (err) {
               console.log('Error getting logs from Auth0', err);
               return callback(new NestedError('Error getting logs from Auth0: ', err));
@@ -65,12 +59,19 @@ function lastLogCheckpoint(req, res) {
 
             console.log(`Total logs: ${context.logs.length}.`);
             return callback(null, context);
-          });
+          };
+          console.log(`Logs from: ${context.checkpointId || 'Start'}.`);
+          let take = Number.parseInt(ctx.data.BATCH_SIZE);
+          context.logs = context.logs || [];
+          if (!context.checkpointId)
+            getInitialLogsFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, take, handleLogs);
+          else
+            getLogsFromAuth0(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, take, context.checkpointId, handleLogs);
         };
-
         getLogs({ checkpointId: startCheckpointId });
       },
       (context, callback) => {
+        console.log("Logs: ", context.logs);
         // sdu successful user deletion
         context.logs = context.logs
           .filter(l => l.type === 'sdu' || l.type == 'ss');
@@ -78,52 +79,60 @@ function lastLogCheckpoint(req, res) {
         callback(null, context);
       },
       (context, callback) => {
-        console.log("Logs: " + context.logs.length);
+        console.log("Logs: ", context.logs);
+        context.matches = {};
         if (!context.logs.length) {
           return callback(null, context);
         }
 
 
-        context.userDeleteMatches = {};
-        var errors = [];
+        const errors = [];
         context.logs.forEach(log => {
           console.log("Log: ", log);
-          const userId = log.description.split(/:\s+/, 1)[1];
+          const userId = log.type === 'sdu' ? /user_id:\s+(.+)/.exec(log.description)[1] : log.user_id;
+          console.log("UserId: " + userId);
           if (!userId) {
             console.log("Missing description from log entry: ", log);
             errors.push("Missing userId from description: " + log.description);
           } else if (log.type === 'sdu') {
-            context.userDeleteMatches[userId] = true;
+            context.matches[userId] = true;
           } else if (log.type === 'ss') {
-            delete context.userDeleteMatches[userId];
+            delete context.matches[userId];
           }
         });
+        var err = null;
+        if (errors.length)
+          err = new Error(errors.join("; "));
         callback(err, context);
       },
       (context, callback) => {
+        console.log("Matches: ", context.matches);
         const concurrent_calls = 3;
         const errors = [];
 
-        if (context.userDeleteMatches.keys().length === 0)
+        const deleteMatches = Object.keys(context.matches);
+        if (deleteMatches.length === 0)
           return callback(null, context);
 
-        console.log("UserDeleteMatches: ", context.userDeleteMatches);
-        async.eachLimit(context.userDeleteMatches.keys(), concurrent_calls, function (userId, cb) {
-          userExists(userId, (err, email) => {
+        console.log("UserDeleteMatches: ", deleteMatches);
+        async.eachLimit(deleteMatches, concurrent_calls, function (userId, cb) {
+          userExists(userId, (err, doesExists) => {
             if (err) {
+              console.log("Error from userExists: ", err);
               errors.push("" + err);
             }
-            if (!email && !err) {
+            if (!doesExist && !err) {
+              console.log("Calling deleteFirebaseUse with " + userId);
               deleteFirebaseUser(userId, (err) => {
                 if (err) {
                   errors.push("" + err);
                 }
                 cb();
               });
-            }
+            } else cb();
           });
         }, (err) => {
-          if (!err && errors) 
+          if (!err && errors.length) 
             err = new Error(errors.join("; "));
           callback(err, context);
         });
@@ -163,13 +172,15 @@ function lastLogCheckpoint(req, res) {
 
 function deleteFirebaseUser(userId, cb) {
   console.log("Delete Firbase User " + userId);
-  fbadmin.auth().deleteUser(userId)
+  fbadmin.auth().deleteUser(md5(userId))
     .then(() => cb(null))
-    .catch(e => cb(e));
+    .catch(e => {
+      cb(e);
+    });
 }
 
 function userExits(userId, cb) {
-  var url = `https://${domain}/api/v2/users/${userId}`;
+  var url = `https://${domain}/api/v2/users/` + md5(userId);
 
   Request({
     method: 'GET',
@@ -184,8 +195,9 @@ function userExits(userId, cb) {
     }
   }, (err, res, body) => {
     if (err) {
+      console.log("statusCode: " + res.statusCode);
       console.log("Error getting user " + userId + ": ", err);
-      cb(null, false);
+      cb(null, res.statusCode !== 404);
     } else {
       cb(null, true);
     }
@@ -204,6 +216,34 @@ function getPageOfLogsFromAuth0 (domain, token, take, from, cb) {
       take: take,
       from: from,
       sort: 'date:1',
+      per_page: take
+    },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json'
+    }
+  }, (err, res, body) => {
+    if (err) {
+      console.log('Error getting logs', err);
+      cb(new NestedError('Error getting logs: ', err));
+    } else {
+      cb(null, body);
+    }
+  });
+}
+
+function getInitialLogsFromAuth0(domain, token, take, cb) {
+  console.log("Fetch initial logs: take: " + take);
+  var url = `https://${domain}/api/v2/logs`;
+
+  Request({
+    method: 'GET',
+    url: url,
+    json: true,
+    qs: {
+      take: take,
+      from: null,
+      sort: 'date:-1',
       per_page: take
     },
     headers: {
