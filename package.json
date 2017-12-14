@@ -23,6 +23,7 @@
   "homepage": "https://github.com/auth0/auth0-management-api-webhooks#readme",
   "dependencies": {
     "async": "^1.0.0",
+    "crypto": "^1.0.1",
     "express": "^4.12.4",
     "firebase-admin": "^5.5.1",
     "lru-memoizer": "^1.2.0",

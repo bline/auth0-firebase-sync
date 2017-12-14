@@ -1,19 +1,19 @@
 {
-  "title": "Firebase Module to Sync Users",
+  "title": "Delete Firebase User Trigger",
   "name": "bline-firebase-sync",
-  "version": "0.1.0",
-  "author": "Scott Beck",
+  "version": "0.2.0",
+  "author": "bline",
   "description": "Allows you to sync your users in Auth0 with Firebase by scanning logs on a wt cron.",
   "type": "cron",
-  "logoUrl": "https://cdn.auth0.com/extensions/auth0-authentication-api-webhooks/assets/logo.png",
   "repository": "https://github.com/bline/auth0-firebase-sync",
   "keywords": [
     "auth0",
-    "extension"
+    "extension",
+    "firebase"
   ],
-  "schedule": "0 */15 * * * *",
+  "schedule": "* */5 * * * *",
   "auth0": {
-    "scopes": "read:logs"
+    "scopes": "read:logs read:users read:user_idp_tokens"
   },
   "secrets": {
     "BATCH_SIZE": {
