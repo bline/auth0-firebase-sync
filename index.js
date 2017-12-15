@@ -4,6 +4,7 @@ const express  = require('express');
 const Webtask  = require('webtask-tools');
 const app      = express();
 const Request  = require('request');
+//Request.debug = true;
 const memoizer = require('lru-memoizer');
 const NestedError = require('nested-error-stacks');
 const crypto   = require('crypto');
@@ -19,7 +20,6 @@ function lastLogCheckpoint(req, res) {
   let ctx               = req.webtaskContext;
   let required_settings = ['AUTH0_DOMAIN', 'AUTH0_CLIENT_ID', 'AUTH0_CLIENT_SECRET', 'FIREBASE_SECRET_KEY'];
   let missing_settings  = required_settings.filter((setting) => !ctx.data[setting]);
-  console.log("in lastLogCheckpoint");
 
   if (missing_settings.length) {
     return res.status(400).send({ message: 'Missing settings: ' + missing_settings.join(', ') });
@@ -38,6 +38,11 @@ function lastLogCheckpoint(req, res) {
   secretKey = null;
   // If this is a scheduled task, we'll get the last log checkpoint from the previous run and continue from there.
   req.webtaskContext.storage.get((err, data) => {
+    if (err) {
+      console.log("StatusCode: " + err.output.statusCode);
+      console.log("Code: " + err.code);
+      console.log("Error: ", err);
+    }
     if (err && err.output.statusCode !== 404) return res.status(err.code).send(err);
 
     let startCheckpointId = typeof data === 'undefined' ? null : data.checkpointId;
@@ -71,33 +76,42 @@ function lastLogCheckpoint(req, res) {
         getLogs({ checkpointId: startCheckpointId });
       },
       (context, callback) => {
-        console.log("Logs: ", context.logs);
         // sdu successful user deletion
         context.logs = context.logs
-          .filter(l => l.type === 'sdu' || l.type == 'ss');
+          .filter(l => l.type === 'sdu' || l.type === 'ss' || (l.type === 'sapi' && l.description === 'Delete a user'));
 
         callback(null, context);
       },
       (context, callback) => {
-        console.log("Logs: ", context.logs);
         context.matches = {};
         if (!context.logs.length) {
           return callback(null, context);
         }
 
-
         const errors = [];
         context.logs.forEach(log => {
-          console.log("Log: ", log);
-          const userId = log.type === 'sdu' ? /user_id:\s+(.+)/.exec(log.description)[1] : log.user_id;
-          console.log("UserId: " + userId);
+          var userId, type = '';
+          if (log.type === 'sapi') {
+            var apiCall;
+            if (log.details && log.details.request)
+              apiCall = log.details.request.path;
+            if (apiCall) {
+              userId = decodeURIComponent(/\/([^\/]+)$/.exec(apiCall)[1] || '');
+              if (userId)
+                type = 'sdu';
+            }
+          } else {
+            type = log.type;
+            userId = log.type === 'sdu' ? /user_id:\s+(.+)/.exec(log.description)[1] : log.user_id;
+          }
           if (!userId) {
             console.log("Missing description from log entry: ", log);
             errors.push("Missing userId from description: " + log.description);
-          } else if (log.type === 'sdu') {
+          } else if (type === 'sdu') {
             context.matches[userId] = true;
-          } else if (log.type === 'ss') {
-            delete context.matches[userId];
+          } else if (type === 'ss') {
+            if (context.matches[userId])
+              delete context.matches[userId];
           }
         });
         var err = null;
@@ -106,7 +120,6 @@ function lastLogCheckpoint(req, res) {
         callback(err, context);
       },
       (context, callback) => {
-        console.log("Matches: ", context.matches);
         const concurrent_calls = 3;
         const errors = [];
 
@@ -114,22 +127,22 @@ function lastLogCheckpoint(req, res) {
         if (deleteMatches.length === 0)
           return callback(null, context);
 
-        console.log("UserDeleteMatches: ", deleteMatches);
         async.eachLimit(deleteMatches, concurrent_calls, function (userId, cb) {
-          userExists(userId, (err, doesExists) => {
+          auth0UserExists(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, userId, (err, userExists) => {
             if (err) {
               console.log("Error from userExists: ", err);
               errors.push("" + err);
             }
-            if (!doesExist && !err) {
-              console.log("Calling deleteFirebaseUse with " + userId);
+            if (!userExists && !err) {
               deleteFirebaseUser(userId, (err) => {
                 if (err) {
                   errors.push("" + err);
                 }
                 cb();
               });
-            } else cb();
+            } else {
+              cb();
+            }
           });
         }, (err) => {
           if (!err && errors.length) 
@@ -171,17 +184,22 @@ function lastLogCheckpoint(req, res) {
 }
 
 function deleteFirebaseUser(userId, cb) {
-  console.log("Delete Firbase User " + userId);
-  fbadmin.auth().deleteUser(md5(userId))
+  var uid = md5(userId);
+  console.log("Delete Firebase User " + userId + ' -> ' + uid);
+  fbadmin.auth().deleteUser(uid)
     .then(() => cb(null))
     .catch(e => {
-      cb(e);
+      if (e.errorInfo && e.errorInfo.code === 'auth/user-not-found')
+        cb(null);
+      else {
+        console.log("Error delete: ", e);
+        cb(e);
+      }
     });
 }
 
-function userExits(userId, cb) {
-  var url = `https://${domain}/api/v2/users/` + md5(userId);
-
+function auth0UserExists(domain, token, userId, cb) {
+  var url = `https://${domain}/api/v2/users/${userId}`;
   Request({
     method: 'GET',
     url: url,
@@ -197,9 +215,9 @@ function userExits(userId, cb) {
     if (err) {
       console.log("statusCode: " + res.statusCode);
       console.log("Error getting user " + userId + ": ", err);
-      cb(null, res.statusCode !== 404);
+      cb(err, res.statusCode !== 404);
     } else {
-      cb(null, true);
+      cb(null, res.statusCode !== 404);
     }
   })
 
