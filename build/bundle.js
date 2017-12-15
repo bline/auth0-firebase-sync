@@ -53,6 +53,7 @@ module.exports =
 	var Webtask = __webpack_require__(4);
 	var app = express();
 	var Request = __webpack_require__(14);
+	//Request.debug = true;
 	var memoizer = __webpack_require__(15);
 	var NestedError = __webpack_require__(16);
 	var crypto = __webpack_require__(17);
@@ -69,7 +70,6 @@ module.exports =
 	  var missing_settings = required_settings.filter(function (setting) {
 	    return !ctx.data[setting];
 	  });
-	  console.log("in lastLogCheckpoint");
 
 	  if (missing_settings.length) {
 	    return res.status(400).send({ message: 'Missing settings: ' + missing_settings.join(', ') });
@@ -88,6 +88,11 @@ module.exports =
 	  secretKey = null;
 	  // If this is a scheduled task, we'll get the last log checkpoint from the previous run and continue from there.
 	  req.webtaskContext.storage.get(function (err, data) {
+	    if (err) {
+	      console.log("StatusCode: " + err.output.statusCode);
+	      console.log("Code: " + err.code);
+	      console.log("Error: ", err);
+	    }
 	    if (err && err.output.statusCode !== 404) return res.status(err.code).send(err);
 
 	    var startCheckpointId = typeof data === 'undefined' ? null : data.checkpointId;
@@ -118,15 +123,13 @@ module.exports =
 	      };
 	      getLogs({ checkpointId: startCheckpointId });
 	    }, function (context, callback) {
-	      console.log("Logs: ", context.logs);
 	      // sdu successful user deletion
 	      context.logs = context.logs.filter(function (l) {
-	        return l.type === 'sdu' || l.type == 'ss';
+	        return l.type === 'sdu' || l.type === 'ss' || l.type === 'sapi' && l.description === 'Delete a user';
 	      });
 
 	      callback(null, context);
 	    }, function (context, callback) {
-	      console.log("Logs: ", context.logs);
 	      context.matches = {};
 	      if (!context.logs.length) {
 	        return callback(null, context);
@@ -134,45 +137,54 @@ module.exports =
 
 	      var errors = [];
 	      context.logs.forEach(function (log) {
-	        console.log("Log: ", log);
-	        var userId = log.type === 'sdu' ? /user_id:\s+(.+)/.exec(log.description)[1] : log.user_id;
-	        console.log("UserId: " + userId);
+	        var userId,
+	            type = '';
+	        if (log.type === 'sapi') {
+	          var apiCall;
+	          if (log.details && log.details.request) apiCall = log.details.request.path;
+	          if (apiCall) {
+	            userId = decodeURIComponent(/\/([^\/]+)$/.exec(apiCall)[1] || '');
+	            if (userId) type = 'sdu';
+	          }
+	        } else {
+	          type = log.type;
+	          userId = log.type === 'sdu' ? /user_id:\s+(.+)/.exec(log.description)[1] : log.user_id;
+	        }
 	        if (!userId) {
 	          console.log("Missing description from log entry: ", log);
 	          errors.push("Missing userId from description: " + log.description);
-	        } else if (log.type === 'sdu') {
+	        } else if (type === 'sdu') {
 	          context.matches[userId] = true;
-	        } else if (log.type === 'ss') {
-	          delete context.matches[userId];
+	        } else if (type === 'ss') {
+	          if (context.matches[userId]) delete context.matches[userId];
 	        }
 	      });
 	      var err = null;
 	      if (errors.length) err = new Error(errors.join("; "));
 	      callback(err, context);
 	    }, function (context, callback) {
-	      console.log("Matches: ", context.matches);
 	      var concurrent_calls = 3;
 	      var errors = [];
 
 	      var deleteMatches = Object.keys(context.matches);
 	      if (deleteMatches.length === 0) return callback(null, context);
 
-	      console.log("UserDeleteMatches: ", deleteMatches);
 	      async.eachLimit(deleteMatches, concurrent_calls, function (userId, cb) {
-	        userExists(userId, function (err, doesExists) {
+	        auth0UserExists(req.webtaskContext.data.AUTH0_DOMAIN, req.access_token, userId, function (err, userExists) {
 	          if (err) {
 	            console.log("Error from userExists: ", err);
 	            errors.push("" + err);
 	          }
-	          if (!doesExist && !err) {
-	            console.log("Calling deleteFirebaseUse with " + userId);
+	          if (!userExists && !err) {
 	            deleteFirebaseUser(userId, function (err) {
 	              if (err) {
 	                errors.push("" + err);
 	              }
 	              cb();
 	            });
-	          } else cb();
+	          } else {
+	            cb();
+	          }
 	        });
 	      }, function (err) {
 	        if (!err && errors.length) err = new Error(errors.join("; "));
@@ -212,17 +224,20 @@ module.exports =
 	}
 
 	function deleteFirebaseUser(userId, cb) {
-	  console.log("Delete Firbase User " + userId);
-	  fbadmin.auth().deleteUser(md5(userId)).then(function () {
+	  var uid = md5(userId);
+	  console.log("Delete Firebase User " + userId + ' -> ' + uid);
+	  fbadmin.auth().deleteUser(uid).then(function () {
 	    return cb(null);
 	  }).catch(function (e) {
-	    cb(e);
+	    if (e.errorInfo && e.errorInfo.code === 'auth/user-not-found') cb(null);else {
+	      console.log("Error delete: ", e);
+	      cb(e);
+	    }
 	  });
 	}
 
-	function userExits(userId, cb) {
-	  var url = 'https://' + domain + '/api/v2/users/' + md5(userId);
-
+	function auth0UserExists(domain, token, userId, cb) {
+	  var url = 'https://' + domain + '/api/v2/users/' + userId;
 	  Request({
 	    method: 'GET',
 	    url: url,
@@ -238,9 +253,9 @@ module.exports =
 	    if (err) {
 	      console.log("statusCode: " + res.statusCode);
 	      console.log("Error getting user " + userId + ": ", err);
-	      cb(null, res.statusCode !== 404);
+	      cb(err, res.statusCode !== 404);
 	    } else {
-	      cb(null, true);
+	      cb(null, res.statusCode !== 404);
 	    }
 	  });
 	}
